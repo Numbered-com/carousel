@@ -11,6 +11,7 @@ export default function BlossomCarousel({
 	children,
 	as: Component = 'div',
 	repeat,
+	load,
 	onChange,
 	ref,
 	elementRef,
@@ -19,6 +20,7 @@ export default function BlossomCarousel({
 	children?: ReactNode | Array<ReactNode>
 	as?: ElementType
 	repeat?: boolean
+	load?: 'always'
 	onChange?: (event: CustomEvent<{ index: number }>) => void
 	ref?: Ref<BlossomCarouselRef | null>
 	elementRef?: Ref<HTMLElement | null>
@@ -29,6 +31,9 @@ export default function BlossomCarousel({
 
 	useEffect(() => {
 		if (!localRef.current) return
+
+		const hasMouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches
+		if (!hasMouse && load !== 'always') return
 
 		const blossom = Blossom(localRef.current, { repeat })
 		blossomRef.current = blossom
