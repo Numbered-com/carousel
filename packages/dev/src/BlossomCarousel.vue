@@ -27,9 +27,15 @@ const props = defineProps({
 });
 
 const root = shallowRef(null);
-defineExpose({ el: root });
+let blossom;
 
-let blossom = null;
+defineExpose({
+  el: root,
+  next: () => blossom?.next(),
+  prev: () => blossom?.prev(),
+  currentIndex: () => blossom?.currentIndex(),
+});
+
 onMounted(async () => {
   const hasMouse = window.matchMedia(
     "(hover: hover) and (pointer: fine)"
@@ -44,6 +50,7 @@ onMounted(async () => {
   blossom = Blossom(root.value, { repeat: props.repeat });
   blossom.init();
 });
+
 onBeforeUnmount(() => {
   blossom?.destroy();
 });

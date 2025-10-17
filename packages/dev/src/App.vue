@@ -1,39 +1,18 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref } from "vue";
 import BlossomCarousel from "./BlossomCarousel.vue";
 import "../../core/src/style.css";
 
 const blossom = ref(null);
-// const slides = ref([]);
-// function onOverScroll(event) {
-//   event.preventDefault();
-//   const offset = event.detail.left / blossom.value?.el.clientWidth;
-//   slides.value.forEach((el, i) => {
-//     const rotate = -70 * offset * Math.min(i + 1, slides.value.length + 1 - i);
-//     const translateX = event.detail.left;
-//     const translateZ =
-//       i === 0
-//         ? 100 * offset
-//         : -100 * offset * Math.min(i, slides.value.length - i);
-//     const scale =
-//       i === 0 || i === slides.value.length - 1
-//         ? 1 + 0.2 * offset
-//         : 1 - 0.2 * offset * Math.min(i, slides.value.length - i);
-//     el.style.transform = `translateX(${translateX}px) rotateY(${rotate}deg)  translateZ(${translateZ}px) scale(${scale})`;
-//   });
-// }
-// onMounted(() => {
-//   blossom.value?.el?.addEventListener("overscroll", onOverScroll);
-// });
-// onBeforeUnmount(() => {
-//   blossom.value?.el?.removeEventListener("overscroll", onOverScroll);
-// });
+const currentSlideIndex = ref(0);
+
 function add() {
   const slide = document.createElement("li");
   slide.className = "slide";
   slide.innerHTML = `<p>${Math.floor(Math.random() * 100)}</p>`;
   blossom.value?.el?.appendChild(slide);
 }
+
 function remove() {
   const slides = blossom.value?.el?.querySelectorAll(".slide");
   if (slides.length > 0) {
@@ -41,77 +20,39 @@ function remove() {
   }
 }
 
-const getCurrentSlide = () => {
-  if (!blossom.value) return null;
-
-  const carousel = blossom.value.$el;
-  const slides = carousel.children;
-  const carouselRect = carousel.getBoundingClientRect();
-  const carouselLeft = carouselRect.left;
-
-  let closestSlide = null;
-  let closestDistance = Infinity;
-
-  for (let i = 0; i < slides.length; i++) {
-    const slide = slides[i];
-    const slideRect = slide.getBoundingClientRect();
-    const distance = Math.abs(slideRect.left - carouselLeft);
-
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closestSlide = { element: slide, index: i };
-    }
-  }
-
-  return closestSlide;
-};
-
 const prev = () => {
-  const currentSlide = getCurrentSlide();
-  if (!currentSlide || !blossom.value) return;
-
-  const carousel = blossom.value.$el;
-  const slides = carousel.children;
-  const prevIndex = currentSlide.index - 1;
-
-  if (prevIndex >= 0) {
-    const prevSlide = slides[prevIndex];
-    prevSlide.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "start",
-    });
-  }
+  blossom.value?.prev();
 };
 
 const next = () => {
-  const currentSlide = getCurrentSlide();
-  if (!currentSlide || !blossom.value) return;
+  blossom.value?.next();
+};
 
-  const carousel = blossom.value.$el;
-  const slides = carousel.children;
-  const nextIndex = currentSlide.index + 1;
-
-  if (nextIndex < slides.length) {
-    const nextSlide = slides[nextIndex];
-    nextSlide.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "start",
-    });
-  }
+const handleChange = ({detail}) => {
+	const index = detail.index;
+	currentSlideIndex.value = index;
 };
 </script>
 
 <template>
   <div class="page">
     <h1>Blossom Dev</h1>
+    <p>Current Slide: {{ currentSlideIndex + 1 }}</p>
     <div class="wrapper">
-      <BlossomCarousel ref="blossom" class="carousel" as="ul">
+			<BlossomCarousel ref="blossom" class="blossom" as="ul" @change="handleChange">
+				<li v-for="i in 12" ref="slides" :key="`slide${i}`" class="slide">
+					<a href="https://www.google.com" target="_blank">
+						<p>{{ i }}</p>
+					</a>
+				</li>
+			</BlossomCarousel>
+      <!-- <BlossomCarousel ref="blossom" class="blossom" as="ul" :on-index-change="handleIndexChange" repeat>
         <li v-for="i in 12" ref="slides" :key="`slide${i}`" class="slide">
-          <p>{{ i }}</p>
+					<a href="https://www.google.com" target="_blank">
+          	<p>{{ i }}</p>
+					</a>
         </li>
-      </BlossomCarousel>
+      </BlossomCarousel> -->
     </div>
     <div class="controls">
       <button @click="add">add slide</button>
@@ -136,40 +77,61 @@ const next = () => {
 
 .wrapper {
   /* max-width: 1000px; */
+	overflow: clip;
 }
 
-.carousel {
-  /* padding-inline: 10rem; */
-  /* scroll-padding-inline: 10rem; */
+.blossom {
   /* padding-inline: 1rem; */
   /* scroll-padding-inline: 1rem; */
 
+	/* scroll-padding-inline: 50% !important;
+  padding-inline: 50% !important; */
+
+	/* scroll-padding-inline: 20% !important; */
+  padding-inline: 50% !important;
+
   scroll-snap-type: x mandatory;
   scroll-snap-stop: always;
+	padding-inline: 0;
 
-  padding-block: 4rem;
-  margin-block: -4rem;
+	/* padding-inline: 3rem; */
 
-  /* display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 300px;
-  grid-gap: 1rem; */
+	display: flex;
+	gap: 1rem;
 }
 
 .slide {
+	flex-shrink: 0;
   width: 300px;
-  margin-right: 1rem;
   aspect-ratio: 3/4;
-  scroll-snap-align: center;
   background-color: #404040;
   border-radius: 1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  /* border: 1px solid red; */
+
+	@media (max-width: 767px) {
+		scroll-snap-align: center;
+		background-color: #606060;
+  }
+
+	@media (min-width: 768px) {
+		&:nth-child(2n+1) {
+			scroll-snap-align: center;
+			background-color: #606060;
+		}
+	}
+
+	a {
+		width: 100%;
+		height: 100%;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
 }
 
-/* .carousel {
+/* .blossom {
   perspective: 1000px;
 }
 
@@ -177,19 +139,9 @@ const next = () => {
   transform-style: preserve-3d;
   container-type: scroll-state;
 
-  > p {
-    width: 100%;
-    height: 100%;
-    border-radius: 1rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #404040;
-    transform-style: preserve-3d;
-    animation: carousel linear both;
-    animation-timeline: view(x);
-    animation-range: cover;
-  }
+	animation: carousel linear both;
+	animation-timeline: view(x);
+	animation-range: cover;
 }
 
 @keyframes carousel {
