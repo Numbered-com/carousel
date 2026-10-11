@@ -3,8 +3,8 @@
 # Blossom Carousel
 
 <p>
-<a href="https://www.npmjs.com/package/@numbered/carousel/core"><img src="https://img.shields.io/npm/v/@numbered/carousel/core.svg?color=%23c1a8e2"></a>
-<a href="https://bundlephobia.com/package/@numbered/carousel/core"><img src="https://img.shields.io/bundlephobia/minzip/@numbered/carousel/core?color=%238ab4f8&label=gzip%20size"></a>
+<a href="https://www.npmjs.com/package/@numbered/carousel"><img src="https://img.shields.io/npm/v/@numbered/carousel.svg?color=%23c1a8e2"></a>
+<a href="https://bundlephobia.com/package/@numbered/carousel"><img src="https://img.shields.io/bundlephobia/minzip/@numbered/carousel?color=%238ab4f8&label=gzip%20size"></a>
 </p>
 
 The native-first carousel enhanced with drag support.
@@ -29,7 +29,7 @@ The native-first carousel enhanced with drag support.
 [React Docs](./packages/react)
 
 ```bash
-npm install @numbered/carousel/react
+npm install @numbered/carousel-react @numbered/carousel
 ```
 
 ### Vue
@@ -37,7 +37,7 @@ npm install @numbered/carousel/react
 [Vue Docs](./packages/vue)
 
 ```bash
-npm install @numbered/carousel/vue
+npm install @numbered/carousel-vue @numbered/carousel
 ```
 
 ### Svelte
@@ -45,7 +45,7 @@ npm install @numbered/carousel/vue
 [Svelte Docs](./packages/svelte)
 
 ```bash
-npm install @numbered/carousel/svelte
+npm install @numbered/carousel-svelte @numbered/carousel
 ```
 
 ### Web Component
@@ -53,7 +53,7 @@ npm install @numbered/carousel/svelte
 [Web Component Docs](./packages/web)
 
 ```bash
-npm install @numbered/carousel/web
+npm install @numbered/carousel-web @numbered/carousel
 ```
 
 ### Core
@@ -61,7 +61,7 @@ npm install @numbered/carousel/web
 [Core Docs](./packages/core)
 
 ```bash
-npm install @numbered/carousel/core
+npm install @numbered/carousel
 ```
 
 ## Examples
