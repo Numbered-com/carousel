@@ -11,9 +11,9 @@
     },
     "packages/alpine": {
       "name": "@numbered/carousel-alpine",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "dependencies": {
-        "@numbered/carousel": "^0.1.10",
+        "@numbered/carousel": "^1.0.0",
       },
       "devDependencies": {
         "@types/alpinejs": "^3.17.0",
@@ -29,7 +29,7 @@
     },
     "packages/core": {
       "name": "@numbered/carousel",
-      "version": "0.1.10",
+      "version": "1.0.0",
       "dependencies": {
         "vite": "^8.3.4",
         "vite-plugin-dts": "^5.1.2",
@@ -54,9 +54,9 @@
     },
     "packages/react": {
       "name": "@numbered/carousel-react",
-      "version": "0.1.16",
+      "version": "0.1.17",
       "dependencies": {
-        "@numbered/carousel": "^0.1.10",
+        "@numbered/carousel": "^1.0.0",
       },
       "devDependencies": {
         "@types/react": "19.3.0",
@@ -83,7 +83,7 @@
         "vite-plugin-dts": "^5.1.2",
       },
       "optionalDependencies": {
-        "@numbered/carousel": "^0.1.10",
+        "@numbered/carousel": "^1.0.0",
       },
       "peerDependencies": {
         "svelte": "^4.0.0 || ^5.0.0",
@@ -93,7 +93,7 @@
       "name": "@numbered/carousel-vue",
       "version": "0.1.9",
       "dependencies": {
-        "@numbered/carousel": "^0.1.10",
+        "@numbered/carousel": "^1.0.0",
       },
       "devDependencies": {
         "@vitejs/plugin-vue": "^6.0.10",
@@ -109,7 +109,7 @@
       "name": "@numbered/carousel-web",
       "version": "0.1.8",
       "dependencies": {
-        "@numbered/carousel": "^0.1.10",
+        "@numbered/carousel": "^1.0.0",
       },
       "devDependencies": {
         "typescript": "^7.0.2",

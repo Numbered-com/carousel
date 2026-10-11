@@ -54,7 +54,7 @@
 		"svelte": "^4.0.0 || ^5.0.0"
 	},
 	"optionalDependencies": {
-		"@numbered/carousel": "^0.1.10"
+		"@numbered/carousel": "^1.0.0"
 	},
 	"scripts": {
 		"dev": "vite",

@@ -1,6 +1,6 @@
 {
 	"name": "@numbered/carousel-react",
-	"version": "0.1.16",
+	"version": "0.1.17",
 	"author": "Jesper Vos",
 	"license": "MIT",
 	"description": "A native-scroll-first carousel component for React.",
@@ -68,6 +68,6 @@
 		"vite-plugin-dts": "^5.1.2"
 	},
 	"dependencies": {
-		"@numbered/carousel": "^0.1.10"
+		"@numbered/carousel": "^1.0.0"
 	}
 }
