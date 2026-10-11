@@ -152,7 +152,11 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	let snapPoints: number[] = []
 	let snapElements: HTMLElement[] = []
 	let snapAlignments: ScrollLogicalPosition[] = []
-	let snapCenters: number[] = []
+	// Repeat mode only: each slide's centre (from sync, so onRepeat never reads layout) and the
+	// slide that holds each snap point, so the point moves with the slide that carries it
+	const slideCenters: number[] = []
+	const snapSlides: number[] = []
+	const slideOffsets: number[] = []
 	let snapCandidates: SnapCandidate[] = []
 	const virtualSnapPoints: number[] = []
 	let slides: HTMLElement[] = []
@@ -365,12 +369,20 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		// Measured from the slides, not scrollWidth, because repeat's trailing spacer
 		// (style.css) can take a whole grid track. min/max keeps it direction-agnostic.
 		if (options?.repeat && slides.length) {
-			const edges = [slides[0], slides[slides.length - 1]].map((el) => {
-				const rect = el.getBoundingClientRect()
-				const style = window.getComputedStyle(el)
-				return [rect.left - (Number.parseFloat(style.marginLeft) || 0), rect.right + (Number.parseFloat(style.marginRight) || 0)]
-			})
-			loopWidth = Math.max(edges[0][1], edges[1][1]) - Math.min(edges[0][0], edges[1][0]) + gap
+			const origin = scrollOrigin()
+			slideCenters.length = slides.length
+			let lo = Infinity
+			let hi = -Infinity
+			for (let i = 0; i < slides.length; i++) {
+				const [start, size] = layoutBox(slides[i], origin)
+				slideCenters[i] = start + size / 2
+				if (i === 0 || i === slides.length - 1) {
+					const style = window.getComputedStyle(slides[i])
+					lo = Math.min(lo, start - (Number.parseFloat(style.marginLeft) || 0))
+					hi = Math.max(hi, start + size + (Number.parseFloat(style.marginRight) || 0))
+				}
+			}
+			loopWidth = hi - lo + gap
 		}
 
 		// Which elements snap only changes when the child list changes; their positions
@@ -380,6 +392,14 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			candidatesResolved = true
 		}
 		measureSnapPoints()
+		if (options?.repeat) {
+			snapSlides.length = snapElements.length
+			for (let i = 0; i < snapElements.length; i++) {
+				let node: HTMLElement = snapElements[i]
+				while (node.parentElement && node.parentElement !== scroller) node = node.parentElement
+				snapSlides[i] = slides.indexOf(node)
+			}
+		}
 
 		// Slides can disappear from under us; keep the index addressable or prev()/next()
 		// would compute another out-of-range index and stall permanently.
@@ -434,15 +454,49 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		return found
 	}
 
+	// Viewport coordinate of scroll position 0 along the axis. Scroll coordinates start at the
+	// padding box, so exclude the border (and a left scrollbar)
+	function scrollOrigin(): number {
+		const rect = scroller.getBoundingClientRect()
+		return axis === 'y' ? rect.top + scroller.clientTop - scroller.scrollTop : rect.left + scroller.clientLeft - scroller.scrollLeft
+	}
+
+	// [start, size] of el along the axis in scroll coordinates; `origin` is scrollOrigin().
+	// getBoundingClientRect includes transforms, so a transformed slide (e.g. a scroll-driven
+	// coverflow) would skew its snap point: those use offset* instead (layout only, whole px).
+	function layoutBox(el: HTMLElement, origin: number): [start: number, size: number] {
+		const vertical = axis === 'y'
+		let transformed = false
+		for (let node: Element | null = el; node && node !== scroller; node = node.parentElement) {
+			const s = window.getComputedStyle(node)
+			if (s.transform !== 'none' || s.translate !== 'none' || s.rotate !== 'none' || s.scale !== 'none') {
+				transformed = true
+				break
+			}
+		}
+		if (!transformed) {
+			const rect = el.getBoundingClientRect()
+			return vertical ? [rect.top - origin, rect.height] : [rect.left - origin, rect.width]
+		}
+		// Sum offsets up the offsetParent chain; offset* ignore scroll, so the difference is
+		// already in scroll coordinates
+		const pageOffset = (node: HTMLElement): number => {
+			let sum = 0
+			for (let n: HTMLElement | null = node; n; n = n.offsetParent as HTMLElement | null) {
+				const parent = n.offsetParent as HTMLElement | null
+				sum += (vertical ? n.offsetTop : n.offsetLeft) + (parent ? (vertical ? parent.clientTop : parent.clientLeft) : 0)
+			}
+			return sum
+		}
+		const start = pageOffset(el) - pageOffset(scroller) - (vertical ? scroller.clientTop : scroller.clientLeft)
+		return [start, vertical ? el.offsetHeight : el.offsetWidth]
+	}
+
 	// Read-only: no style writes may happen between the rect reads below.
 	function measureSnapPoints(): void {
-		const scrollerRect = scroller.getBoundingClientRect()
 		const vertical = axis === 'y'
 		const viewport = vertical ? scrollerHeight : scrollerWidth
-		// Scroll coordinates start at the padding box, so exclude the border (and a left scrollbar)
-		const origin = vertical
-			? scrollerRect.top + scroller.clientTop - scroller.scrollTop
-			: scrollerRect.left + scroller.clientLeft - scroller.scrollLeft
+		const origin = scrollOrigin()
 		// Native snap clamps snap positions to the scrollable range; unclamped points past the
 		// end are unreachable, so the index could never get there and next() would stall.
 		const maxScroll = getMaxScrollPosition() * dir
@@ -452,14 +506,11 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		snapPoints = []
 		snapElements = []
 		snapAlignments = []
-		snapCenters = []
 		const seenPositions = new Set<number>()
 
 		for (const { el, align, marginStart, marginEnd } of snapCandidates) {
 			// Snap areas are border boxes (clientWidth drops borders and rounds) grown by scroll-margin
-			const rect = el.getBoundingClientRect()
-			const offset = (vertical ? rect.top : rect.left) - origin
-			const size = vertical ? rect.height : rect.width
+			const [offset, size] = layoutBox(el, origin)
 			const areaStart = offset - marginStart
 			const areaEnd = offset + size + marginEnd
 			// start/end are logical: in RTL, start is the physical right edge
@@ -487,7 +538,6 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			snapPoints.push(position)
 			snapElements.push(el)
 			snapAlignments.push(align as ScrollLogicalPosition)
-			snapCenters.push(offset + size / 2)
 		}
 	}
 
@@ -623,19 +673,22 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	 ***** WRAP *****
 	 *********************/
 
-	// Reuse these allocations to avoid GC pressure in repeat mode
-	const repeatVirtualCache: number[] = []
-	const repeatElementOffsetCache = new Map<HTMLElement, number>()
 	const appliedTranslate = new Map<HTMLElement, number>()
 
+	// --blossom-offset mirrors the translate so scroll-driven animations (view() timelines
+	// ignore transforms) can shift their animation-range by it without forcing layout
 	function setTranslate(el: HTMLElement, x: number): void {
 		if (appliedTranslate.get(el) === x) return
 		appliedTranslate.set(el, x)
 		el.style.translate = `${x}px 0`
+		el.style.setProperty('--blossom-offset', `${x}px`)
 	}
 
 	function clearTranslations(): void {
-		for (const el of appliedTranslate.keys()) el.style.translate = ''
+		for (const el of appliedTranslate.keys()) {
+			el.style.translate = ''
+			el.style.removeProperty('--blossom-offset')
+		}
 		appliedTranslate.clear()
 	}
 
@@ -658,42 +711,21 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			}
 		}
 
-		const scrollLeft = virtualScroll.x
-
-		// Clear and reuse cached arrays/maps
-		repeatElementOffsetCache.clear()
-		repeatVirtualCache.length = snapPoints.length
-
-		// Compute offsets for snapped elements first to produce a dense virtualSnapPoints
-		for (let i = 0; i < snapElements.length; i++) {
-			const el = snapElements[i]
-			const basePoint = snapPoints[i] ?? 0
-			// Place each slide in the cycle whose centre is nearest the viewport centre, so the
-			// visible window is symmetric whatever the alignment. snapCenters comes from sync;
-			// reading layout here would force a reflow mid translate writes.
-			const raw = (scrollLeft + scrollerWidth / 2 - (snapCenters[i] ?? 0)) / loopWidth
-			const k = Math.round(raw + (velocity.x >= 0 ? 0.001 : -0.001))
-			const offsetX = k * loopWidth
-			setTranslate(el, offsetX)
-			repeatElementOffsetCache.set(el, offsetX)
-			repeatVirtualCache[i] = basePoint + offsetX
-		}
-
-		// Translate non-snap slides to the nearest previous snapped slide's cycle
-		let previousOffset = 0
+		// Place each slide in the cycle whose centre is nearest the viewport centre, so the
+		// visible window is symmetric whatever the alignment or how many slides share a snap
+		// point. slideCenters comes from sync; reading layout here would force a reflow mid
+		// translate writes.
+		const centre = virtualScroll.x + scrollerWidth / 2
+		const bias = velocity.x >= 0 ? 0.001 : -0.001
+		slideOffsets.length = slides.length
 		for (let i = 0; i < slides.length; i++) {
-			const el = slides[i]
-			const own = repeatElementOffsetCache.get(el)
-			if (own !== undefined) {
-				previousOffset = own
-				continue
-			}
-			setTranslate(el, previousOffset)
+			const offsetX = Math.round((centre - (slideCenters[i] ?? 0)) / loopWidth + bias) * loopWidth
+			slideOffsets[i] = offsetX
+			setTranslate(slides[i], offsetX)
 		}
 
-		// Replace contents of virtualSnapPoints with the dense array
-		virtualSnapPoints.length = 0
-		for (let i = 0; i < repeatVirtualCache.length; i++) virtualSnapPoints.push(repeatVirtualCache[i])
+		virtualSnapPoints.length = snapPoints.length
+		for (let i = 0; i < snapPoints.length; i++) virtualSnapPoints[i] = snapPoints[i] + (slideOffsets[snapSlides[i]] ?? 0)
 	}
 
 	/******************

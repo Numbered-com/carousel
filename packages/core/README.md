@@ -62,6 +62,16 @@ Blossom(element, { repeat: true });
 | -------- | --------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `repeat` | `boolean` | `false` | Infinite loop: slides are translated so the carousel wraps seamlessly in both directions. Horizontal only, and it needs the physics engine, so it only runs where Blossom loads. |
 
+Each translated slide also gets `--blossom-offset` (the same px value). Scroll-driven animations (`animation-timeline: view()`) ignore transforms, so shift their range by it to keep them in sync with the loop:
+
+```css
+.slide {
+  animation: coverflow linear both;
+  animation-timeline: view(x);
+  animation-range: cover calc(0% + var(--blossom-offset, 0px)) cover calc(100% + var(--blossom-offset, 0px));
+}
+```
+
 ## Navigation
 
 ```js
@@ -96,7 +106,7 @@ element.addEventListener("overscroll", (e) => {
 
 ## Snapping
 
-Snapping is plain CSS `scroll-snap`. At rest your `scroll-snap-type` applies, so trackpad, wheel and keyboard scrolls snap natively. While Blossom's physics moves the carousel (dragging, momentum, `next()`/`prev()`), native snapping is switched off through the stylesheet and Blossom lands on the snap point itself. Snap points are re-measured when the carousel, its slides or its children change.
+Snapping is plain CSS `scroll-snap`. At rest your `scroll-snap-type` applies, so trackpad, wheel and keyboard scrolls snap natively. While Blossom's physics moves the carousel (dragging, momentum, `next()`/`prev()`), native snapping is switched off through the stylesheet and Blossom lands on the snap point itself. Snap points are re-measured when the carousel, its slides or its children change. Unlike native snapping, which uses the transformed box, Blossom measures a transformed slide at its layout position (whole pixels), so a scroll-driven effect such as coverflow can't skew its snap points. The two agree when the snapped slide is untransformed at rest, as in a coverflow whose centre keyframe is `transform: none`; otherwise transform an inner element instead of the slide.
 
 ## Vertical carousels
 

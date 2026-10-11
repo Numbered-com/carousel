@@ -90,7 +90,7 @@ The carousel uses a custom physics ticker ([tick function](packages/core/src/car
 5. **Snap axis** - Re-read on every sync from the computed overflow: vertical when `overflow-y` scrolls (`auto`/`scroll`) and `overflow-x` doesn't, otherwise horizontal. A stylesheet can switch it per breakpoint with one DOM. Repeat mode is horizontal only
 6. **Snap suppression** - Physics owns snapping while it moves (`has-snap="false"`) and always in repeat mode (`has-repeat="true"`), both via `scroll-snap-type: none !important` in `style.css`; otherwise the authored `scroll-snap-type` applies
 7. **Virtual snap points** - Improved slide positioning system for more precise alignment
-8. **Repeat mode** - Translates slides to create infinite scroll illusion, resets scroll position when reaching edges (disabled on touch devices)
+8. **Repeat mode** - Translates slides to create infinite scroll illusion, resets scroll position when reaching edges (disabled on touch devices). Each translated slide mirrors its offset in `--blossom-offset` so `view()` timelines (which ignore transforms) can shift their `animation-range`
 9. **Index tracking** - Dispatches custom `change` events with `detail.index` when the active slide changes
 10. **Navigation methods** - `prev()` and `next()` methods for programmatic slide navigation
 
