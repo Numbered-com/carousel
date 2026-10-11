@@ -29,10 +29,10 @@
 	],
 	"devDependencies": {
 		"biome": "^0.3.3",
-		"turbo": "^2.10.7"
+		"turbo": "^2.11.7"
 	},
 	"overrides": {
 		"typescript": "^6.0.3"
 	},
-	"packageManager": "bun@1.3.14"
+	"packageManager": "bun@1.4.3"
 }

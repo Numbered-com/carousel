@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [dts({ skipDiagnostics: true })],
   build: {
     lib: {
-      entry: path.resolve(__dirname, "src/index.ts"),
+      entry: path.resolve(import.meta.dirname, "src/index.ts"),
       name: "BlossomCarousel",
       fileName: "carousel",
     },

@@ -19,7 +19,7 @@ export default defineConfig({
 	],
 	build: {
 		lib: {
-			entry: path.resolve(__dirname, 'src/index.ts'),
+			entry: path.resolve(import.meta.dirname, 'src/index.ts'),
 			name: 'BlossomCarousel',
 			fileName: 'blossom-carousel-svelte',
 			formats: ['es', 'umd'], // ES modules and UMD for broader compatibility

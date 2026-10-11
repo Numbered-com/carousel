@@ -7,7 +7,7 @@ export default defineConfig({
 	plugins: [vue(), dts({ cleanVueFileName: true })],
 	build: {
 		lib: {
-			entry: path.resolve(__dirname, 'src/index.ts'),
+			entry: path.resolve(import.meta.dirname, 'src/index.ts'),
 			name: 'BlossomCarousel',
 			fileName: 'blossom-carousel-vue',
 		},
