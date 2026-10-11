@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import BlossomCarousel from "./BlossomCarousel.vue";
 import "../../core/src/style.css";
 
@@ -9,6 +9,9 @@ const repeat = ref(false);
 const coverflow = ref(false);
 const group = ref(window.matchMedia("(max-width: 767px)").matches ? 1 : 2);
 const snapEvery = computed(() => Math.max(1, Math.floor(group.value) || 1));
+// Changing either remounts the carousel (see :key), which starts at snap 0 without a change event
+const carouselKey = computed(() => `repeat${repeat.value}-group${snapEvery.value}`);
+watch(carouselKey, () => (currentSlideIndex.value = 0));
 
 function add() {
   const slide = document.createElement("li");
@@ -44,7 +47,7 @@ const handleChange = ({detail}) => {
     <h1>Blossom Dev</h1>
     <p>Current Slide: {{ currentSlideIndex + 1 }}</p>
     <div class="wrapper">
-			<BlossomCarousel ref="blossom" :key="`repeat${repeat}-group${snapEvery}`" :class="['blossom', { coverflow }]" as="ul" :repeat="repeat" @change="handleChange">
+			<BlossomCarousel ref="blossom" :key="carouselKey" :class="['blossom', { coverflow }]" as="ul" :repeat="repeat" @change="handleChange">
 				<li v-for="i in 8" ref="slides" :key="`slide${i}`" :class="['slide', { snap: (i - 1) % snapEvery === 0 }]">
 					<a href="https://www.google.com" target="_blank">
 						<p>{{ i }}</p>
@@ -138,7 +141,8 @@ const handleChange = ({detail}) => {
 	.slide {
 		animation: coverflow linear both;
 		animation-timeline: view(x);
-		animation-range: cover;
+		/* repeat mode translates slides, which view() ignores: shift the range to match */
+		animation-range: cover calc(0% + var(--blossom-offset, 0px)) cover calc(100% + var(--blossom-offset, 0px));
 	}
 }
 
