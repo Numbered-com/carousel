@@ -1,15 +1,19 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import BlossomCarousel from "./BlossomCarousel.vue";
 import "../../core/src/style.css";
 
 const blossom = ref(null);
 const currentSlideIndex = ref(0);
 const repeat = ref(false);
+const coverflow = ref(false);
+const group = ref(window.matchMedia("(max-width: 767px)").matches ? 1 : 2);
+const snapEvery = computed(() => Math.max(1, Math.floor(group.value) || 1));
 
 function add() {
   const slide = document.createElement("li");
-  slide.className = "slide";
+  const count = blossom.value?.el?.querySelectorAll(".slide").length ?? 0;
+  slide.className = count % snapEvery.value ? "slide" : "slide snap";
   slide.innerHTML = `<p>${Math.floor(Math.random() * 100)}</p>`;
   blossom.value?.el?.appendChild(slide);
 }
@@ -40,8 +44,8 @@ const handleChange = ({detail}) => {
     <h1>Blossom Dev</h1>
     <p>Current Slide: {{ currentSlideIndex + 1 }}</p>
     <div class="wrapper">
-			<BlossomCarousel ref="blossom" :key="`repeat${repeat}`" class="blossom" as="ul" :repeat="repeat" @change="handleChange">
-				<li v-for="i in 8" ref="slides" :key="`slide${i}`" class="slide">
+			<BlossomCarousel ref="blossom" :key="`repeat${repeat}-group${snapEvery}`" :class="['blossom', { coverflow }]" as="ul" :repeat="repeat" @change="handleChange">
+				<li v-for="i in 8" ref="slides" :key="`slide${i}`" :class="['slide', { snap: (i - 1) % snapEvery === 0 }]">
 					<a href="https://www.google.com" target="_blank">
 						<p>{{ i }}</p>
 					</a>
@@ -63,6 +67,8 @@ const handleChange = ({detail}) => {
       <button @click="prev">prev slide</button>
       <button @click="next">next slide</button>
       <button @click="repeat = !repeat">loop: {{ repeat ? "on" : "off" }}</button>
+      <button @click="coverflow = !coverflow">coverflow: {{ coverflow ? "on" : "off" }}</button>
+      <label>group <input v-model.number="group" type="number" min="1" style="width: 3rem" /></label>
     </div>
   </div>
 </template>
@@ -112,16 +118,9 @@ const handleChange = ({detail}) => {
   align-items: center;
   justify-content: center;
 
-	@media (max-width: 767px) {
+	&.snap {
 		scroll-snap-align: center;
 		background-color: #606060;
-  }
-
-	@media (min-width: 768px) {
-		&:nth-child(2n+1) {
-			scroll-snap-align: center;
-			background-color: #606060;
-		}
 	}
 
 	a {
@@ -133,20 +132,17 @@ const handleChange = ({detail}) => {
 	}
 }
 
-/* .blossom {
+.coverflow {
   perspective: 1000px;
+
+	.slide {
+		animation: coverflow linear both;
+		animation-timeline: view(x);
+		animation-range: cover;
+	}
 }
 
-.slide {
-  transform-style: preserve-3d;
-  container-type: scroll-state;
-
-	animation: carousel linear both;
-	animation-timeline: view(x);
-	animation-range: cover;
-}
-
-@keyframes carousel {
+@keyframes coverflow {
   0% {
     transform: rotateY(-70deg) translateZ(-100px) scale(0.8);
   }
@@ -156,5 +152,5 @@ const handleChange = ({detail}) => {
   to {
     transform: rotateY(70deg) translateZ(-100px) scale(0.8);
   }
-} */
+}
 </style>
