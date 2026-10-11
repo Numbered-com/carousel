@@ -25,6 +25,19 @@
 	&[has-repeat="true"] {
 		scroll-padding-inline: 50% !important;
 		padding-inline: 50% !important;
+
+		/* Scroll-range slack past one loop, so wrapping has hysteresis (see onRepeat). With a
+		   range of exactly one loop, each wrap landed on the opposite threshold and native
+		   scrolling at an edge ping-ponged every frame. A spacer, not padding: padding past
+		   100% in total would widen the scroller. Any positive extent works and JS measures
+		   the loop from the slides, so a grid track wider than this is fine. */
+		&::after {
+			content: "";
+			display: inline-block;
+			flex: none;
+			inline-size: 100px;
+			block-size: 1px;
+		}
 	}
 
 	/* Physics owns snapping while it moves the scroller (has-snap="false"), and for good in

@@ -26,8 +26,9 @@ export default function blossomCarousel(Alpine: Alpine) {
 
 			// Listen for change events
 			carouselEl.addEventListener('change', (e: Event) => {
-				const customEvent = e as CustomEvent<{ index: number }>
-				this.currentIndex = customEvent.detail.index
+				// Native `change` from inputs inside slides, and nested carousels' events, bubble here too
+				if (e.target !== carouselEl || !(e instanceof CustomEvent)) return
+				this.currentIndex = e.detail.index
 			})
 		},
 

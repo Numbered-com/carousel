@@ -138,7 +138,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		},
 	)
 
-	let end = 300
+	// Repeat period: content width plus the trailing gap the last slide would have before the first
+	let loopWidth = 0
 	let raf: number | null = null
 	let isDragging = false
 	let scrollerScrollWidth = 300
@@ -155,6 +156,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	let snapCandidates: SnapCandidate[] = []
 	const virtualSnapPoints: number[] = []
 	let slides: HTMLElement[] = []
+	const observedSlides = new Set<HTMLElement>()
+	let slidesResized = false
 	let resizeObserver: ResizeObserver | null = null
 	let mutationObserver: MutationObserver | null = null
 	// Observer callbacks are coalesced into one sync per microtask; structureDirty
@@ -196,7 +199,10 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			if (target === scroller || scroller.contains(target)) setIsTicking(false)
 		})
 
-		resizeObserver = new ResizeObserver(() => {
+		resizeObserver = new ResizeObserver((entries) => {
+			// A slide's own resize can move snap points without changing the scroller's
+			// aggregate size (one grows, another shrinks), so it must defeat sync()'s size bail
+			if (entries.some((entry) => observedSlides.has(entry.target as HTMLElement))) slidesResized = true
 			scheduleSync(false)
 		})
 		// If scroller width matches parent width, observe parent for resize events
@@ -207,6 +213,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		} else {
 			resizeObserver.observe(scroller)
 		}
+		// Slides are observed too (see sync): one resizing on its own, e.g. a lazy image,
+		// changes snap positions without resizing the scroller or its parent.
 
 		mutationObserver = new MutationObserver(() => {
 			scheduleSync(true)
@@ -221,6 +229,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	function destroy() {
 		scroller.removeAttribute('blossom-carousel')
 		resizeObserver?.disconnect()
+		observedSlides.clear()
 		mutationObserver?.disconnect()
 		if (raf) cancelAnimationFrame(raf)
 		raf = null
@@ -249,7 +258,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		// Undo everything init() wrote. Snapping is suppressed through the has-snap/has-repeat
 		// attributes (style.css), so removing them hands back the authored scroll-snap-type.
 		clearTranslations()
-		scroller.style.transform = ''
+		scroller.style.translate = ''
 		scroller.removeAttribute('has-repeat')
 		scroller.removeAttribute('has-snap')
 
@@ -276,12 +285,13 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	function sync(structureChanged: boolean): void {
 		if (!scroller || !initialised) return
 
-		const widthChanged = scroller.clientWidth !== scrollerWidth
+		const sizeChanged = scroller.clientWidth !== scrollerWidth || scroller.clientHeight !== scrollerHeight
 		const resolveStructure =
 			structureChanged ||
 			!candidatesResolved ||
-			// A width change can flip a media query, changing which elements snap and how
-			widthChanged ||
+			// A size change can flip a (width or height) media query, changing which elements
+			// snap, how, and their scroll-margin
+			sizeChanged ||
 			// MutationObserver is childList-only, so a replaced *nested* slide is invisible
 			// to it. Cheap to detect, and only possible when we resolved deep candidates.
 			(deepCandidates && snapCandidates.some(({ el }) => !scroller.contains(el)))
@@ -293,6 +303,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		// only trustworthy once the translations are cleared, so no early bail there.
 		if (
 			!resolveStructure &&
+			!slidesResized &&
 			!options?.repeat &&
 			scroller.scrollWidth === scrollerScrollWidth &&
 			scroller.scrollHeight === scrollerScrollHeight &&
@@ -300,12 +311,30 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		) {
 			return
 		}
+		slidesResized = false
 
 		setIsTicking(false)
 
 		// Only write before the read phase, never between reads, so the browser flushes once.
 		if (options?.repeat) clearTranslations()
-		if (resolveStructure) slides = Array.from(scroller.children) as HTMLElement[]
+		if (structureChanged || !candidatesResolved) {
+			slides = Array.from(scroller.children) as HTMLElement[]
+			// Only on child-list changes: observing a new target queues an initial notification,
+			// which would otherwise schedule a second sync after every resize.
+			const current = new Set(slides)
+			for (const el of observedSlides) {
+				if (!current.has(el)) {
+					resizeObserver?.unobserve(el)
+					observedSlides.delete(el)
+				}
+			}
+			for (const el of slides) {
+				if (!observedSlides.has(el)) {
+					resizeObserver?.observe(el)
+					observedSlides.add(el)
+				}
+			}
+		}
 
 		scrollerScrollWidth = scroller.scrollWidth
 		scrollerWidth = scroller.clientWidth
@@ -332,7 +361,17 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		// `gap` is the "row column" shorthand; only the gap along the axis separates slides,
 		// and only in flex/grid: the default inline-block layout reports it but never applies it.
 		gap = /flex|grid/.test(styles.display) ? Number.parseFloat(axis === 'x' ? styles.columnGap : styles.rowGap) || 0 : 0
-		end = (scrollerScrollWidth - scrollerWidth + gap) * dir
+		// Loop period: the slides' margin-box span plus the gap that would follow the last one.
+		// Measured from the slides, not scrollWidth, because repeat's trailing spacer
+		// (style.css) can take a whole grid track. min/max keeps it direction-agnostic.
+		if (options?.repeat && slides.length) {
+			const edges = [slides[0], slides[slides.length - 1]].map((el) => {
+				const rect = el.getBoundingClientRect()
+				const style = window.getComputedStyle(el)
+				return [rect.left - (Number.parseFloat(style.marginLeft) || 0), rect.right + (Number.parseFloat(style.marginRight) || 0)]
+			})
+			loopWidth = Math.max(edges[0][1], edges[1][1]) - Math.min(edges[0][0], edges[1][0]) + gap
+		}
 
 		// Which elements snap only changes when the child list changes; their positions
 		// change on every resize. Resolving identity is the expensive half, so cache it.
@@ -491,6 +530,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		window.addEventListener('pointermove', onPointerMove, { passive: true })
 		window.addEventListener('touchmove', onPointerMove, { passive: true })
 		window.addEventListener('pointerup', onPointerUp, { passive: true })
+		window.addEventListener('pointercancel', onPointerUp, { passive: true })
 		window.addEventListener('touchend', onPointerUp, { passive: true })
 	}
 
@@ -498,6 +538,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		window.removeEventListener('pointermove', onPointerMove)
 		window.removeEventListener('touchmove', onPointerMove)
 		window.removeEventListener('pointerup', onPointerUp)
+		window.removeEventListener('pointercancel', onPointerUp)
 		window.removeEventListener('touchend', onPointerUp)
 	}
 
@@ -559,7 +600,15 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	}
 
 	function onKeydown(e: KeyboardEvent): void {
-		if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) setIsTicking(false)
+		// Only keys that can scroll this carousel: focus inside it, or none (Chrome then scrolls
+		// the last-clicked scroller). Arrow keys in an unrelated input mustn't stop the animation.
+		const target = e.target as Node
+		if (
+			['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) &&
+			(scroller.contains(target) || target === document.body || target === document.documentElement)
+		) {
+			setIsTicking(false)
+		}
 	}
 
 	function dragSnap(): void {
@@ -593,12 +642,14 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	function onRepeat(): void {
 		if (!scroller) return
 
-		const loopWidth = getLoopWidth()
-		if (loopWidth === 0) return
+		if (loopWidth <= 0) return
 
-		// Compare along the inline direction, otherwise RTL (negative scrollLeft) wraps every frame
+		// Wrap only when leaving a one-loop window centred in the scroll range, so the wrapped
+		// position lands inside the window, never on the opposite threshold. Compared along the
+		// inline direction, otherwise RTL (negative scrollLeft) wraps every frame.
+		const lo = (getMaxScrollPosition() - loopWidth) / 2
 		const position = virtualScroll.x * dir
-		const shift = position >= end * dir ? -loopWidth * dir : position <= 0 ? loopWidth * dir : 0
+		const shift = position > lo + loopWidth ? -loopWidth * dir : position < lo ? loopWidth * dir : 0
 		if (shift) {
 			virtualScroll.x += shift
 			target.x += shift
@@ -747,13 +798,14 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		if (Math.abs(rubberBandOffset) > 0.01) {
 			const evt = dispatchOverscrollEvent(rubberBandOffset)
 			if (evt.defaultPrevented) return
-			scroller.style.transform = `${axis === 'x' ? 'translateX' : 'translateY'}(${round(rubberBandOffset, 3)}px)`
+			// `translate`, not `transform`, so an author transform on the scroller survives
+			scroller.style.translate = axis === 'x' ? `${round(rubberBandOffset, 3)}px 0` : `0 ${round(rubberBandOffset, 3)}px`
 			return
 		}
 
 		// Only clear once, not on every frame spent at rest
 		if (rubberBandOffset !== 0) {
-			scroller.style.transform = ''
+			scroller.style.translate = ''
 			rubberBandOffset = 0
 		}
 	}
@@ -830,13 +882,14 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	}
 
 	function handleAxisTick(axis: 'x' | 'y'): void {
-		velocity[axis] *= FRICTION
-		if (!isDragging) {
-			target[axis] += velocity[axis]
-			virtualScroll[axis] = damp(virtualScroll[axis], target[axis], DAMPING, frameDelta)
-		} else {
-			virtualScroll[axis] = damp(virtualScroll[axis], target[axis], FRICTION, frameDelta)
-		}
+		// Friction is defined per 60Hz step. Applying it per frame made motion twice as fast at
+		// 120Hz; scale it by elapsed steps instead. The travel term is the closed form of the
+		// per-step series, so it composes exactly: total travel stays v·F/(1−F) at any frame
+		// rate, which animateTo relies on to land on the snap point.
+		const decay = FRICTION ** (frameDelta / (1000 / 60))
+		if (!isDragging) target[axis] += (velocity[axis] * FRICTION * (1 - decay)) / (1 - FRICTION)
+		velocity[axis] *= decay
+		virtualScroll[axis] = damp(virtualScroll[axis], target[axis], isDragging ? FRICTION : DAMPING, frameDelta)
 	}
 
 	function project(): number {
@@ -872,37 +925,26 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	 ********* REPEAT UTILS *********
 	 ******************************/
 
-	function getLoopWidth(): number {
-		return scrollerScrollWidth - scrollerWidth + gap
-	}
-
 	function getMaxScrollPosition(): number {
 		return axis === 'x' ? scrollerScrollWidth - scrollerWidth : scrollerScrollHeight - scrollerHeight
 	}
 
 	function normalizeToCycle(point: number, reference: number): number {
-		const w = getLoopWidth()
+		const w = loopWidth
 		if (w <= 0) return point
 		const k = Math.round((reference - point) / w)
 		return point + k * w
 	}
 
-	function animateTo(position: number, enforceDir?: 1 | -1): void {
+	function animateTo(position: number): void {
 		if (position === undefined || Number.isNaN(position)) return
 
 		setIsTicking(true)
 		target[axis] = virtualScroll[axis]
-		let distance = position - virtualScroll[axis]
-		if (options?.repeat) {
-			const w = getLoopWidth()
-			if (w > 0) {
-				// shortest path wrapping
-				distance = distance - Math.round(distance / w) * w
-				// optionally enforce intended direction (for prev/next)
-				if (enforceDir === 1 && distance * dir <= 0) distance += w * dir
-				if (enforceDir === -1 && distance * dir >= 0) distance -= w * dir
-			}
-		}
+		// No shortest-path wrapping: navigate() already picks the cycle in the intended
+		// direction, and a drag's virtual snap point is the copy it was projected towards.
+		// Wrapping reversed fast repeat drags whose target lay over half a loop away.
+		const distance = position - virtualScroll[axis]
 		const force = distance * (1 - FRICTION) * (1 / FRICTION)
 		velocity[axis] = force
 	}
@@ -910,7 +952,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	function computeRepeatSlideX(targetIndex: number, directionSign: 1 | -1): number {
 		const base = snapPoints[targetIndex] ?? 0
 		const candidate = normalizeToCycle(base, virtualScroll.x)
-		const w = getLoopWidth()
+		const w = loopWidth
 		if (w <= 0) return candidate
 		const delta = candidate - virtualScroll.x
 		if (directionSign === 1 && delta * dir <= 0) return candidate + w * dir
@@ -970,7 +1012,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 
 		const position = options?.repeat && points.length >= 2 ? computeRepeatSlideX(targetIndex, direction) : points[targetIndex]
 
-		animateTo(position, direction)
+		animateTo(position)
 	}
 
 	function next(): void {

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Blossom test case</title>
+		<style>
+			body { font: 12px/1.4 ui-monospace, monospace; margin: 8px; }
+			.pass { color: #0a0; }
+			.fail { color: #c00; font-weight: bold; }
+			.stage { width: 460px; }
+			.carousel { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; }
+			.carousel > * { flex: 0 0 200px; height: 120px; scroll-snap-align: start; background: #dde; }
+			/* Mirror of style.css's repeat and snap-suppression rules; the rest of style.css would restyle every fixture */
+			.repeat-fixture { box-sizing: border-box; padding-inline: 50%; scroll-padding-inline: 50%; }
+			.repeat-fixture::after { content: ''; display: inline-block; flex: none; inline-size: 100px; block-size: 1px; }
+			[has-snap="false"], [has-repeat="true"] { scroll-snap-type: none !important; }
+		</style>
+	</head>
+	<body>
+		<div class="stage" id="stage"></div>
+		<div id="log"></div>
+		<!-- Runs ./cases/<?case>.js alone and reports to the runner (perf-check.html) -->
+		<script type="module">
+			import { results } from './helpers.js'
+
+			const name = new URLSearchParams(location.search).get('case')
+			try {
+				const { default: run } = await import(`./cases/${name}.js`)
+				await run()
+			} catch (error) {
+				results.push({ ok: false, label: `${name} threw`, detail: String(error?.stack ?? error) })
+			}
+			const failures = results.filter((r) => !r.ok).length
+			document.getElementById('log').innerHTML = results
+				.map((r) => `<div class="${r.ok ? 'pass' : 'fail'}">${r.ok ? 'PASS' : 'FAIL'}  ${r.label}  ${r.detail}</div>`)
+				.join('')
+			document.title = failures ? `${failures} FAILED` : 'ALL PASS'
+			parent.postMessage({ case: name, results }, location.origin)
+		</script>
+	</body>
+</html>
