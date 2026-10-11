@@ -119,6 +119,7 @@ A [bun](https://bun.sh) workspace:
 ```bash
 bun install
 bun run dev     # sandbox (packages/dev); dev:react, dev:vue, dev:svelte, dev:alpine, dev:web for each package
+bun run dev:vertical  # responsive demo: horizontal below 1024px, vertical above
 bun run build   # every package
 ```
 

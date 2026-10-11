@@ -13,6 +13,7 @@
 	"module": "dist/blossom-carousel-dev.js",
 	"scripts": {
 		"dev": "vite",
+		"dev:vertical": "vite --open /vertical.html",
 		"build": "vite build",
 		"preview": "vite preview"
 	},

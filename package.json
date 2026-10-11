@@ -18,6 +18,7 @@
 		"build": "bun run --filter '*' build",
 		"publish:all": "bun run build && for p in core react alpine; do bun publish --cwd packages/$p || exit 1; done",
 		"dev": "bun run --filter @numbered/carousel-dev dev",
+		"dev:vertical": "bun run --filter @numbered/carousel-dev dev:vertical",
 		"dev:vue": "bun run --filter @numbered/carousel-vue dev",
 		"dev:react": "bun run --filter @numbered/carousel-react dev",
 		"dev:svelte": "bun run --filter @numbered/carousel-svelte dev",

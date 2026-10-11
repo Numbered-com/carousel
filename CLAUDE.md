@@ -40,6 +40,7 @@ bun install
 
 # Development servers (runs specific package dev server)
 bun run dev           # Run dev sandbox (packages/dev)
+bun run dev:vertical  # Sandbox page: one carousel, horizontal <1024px, vertical >=1024px
 bun run dev:react     # Run React package dev server
 bun run dev:vue       # Run Vue package dev server
 bun run dev:svelte    # Run Svelte package dev server
