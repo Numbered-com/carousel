@@ -70,6 +70,7 @@ Returns an object with:
 - `destroy()` - Clean up and remove event listeners
 - `prev()` - Navigate to previous slide
 - `next()` - Navigate to next slide
+- `currentIndex()` - Index of the active snap point
 - `snap` - Boolean indicating if snap is enabled
 - `hasOverflow` - Proxy object tracking overflow state
 
@@ -161,8 +162,8 @@ const hasMouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches
 ```
 
 **Force loading on all devices**
-```javascript
-Blossom(element, { load: 'always' })
+```jsx
+<BlossomCarousel load="always" /> // wrapper prop; core Blossom() has no load option
 ```
 
 ### Performance Features

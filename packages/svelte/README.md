@@ -46,6 +46,28 @@ Renders as
 </ul>
 ```
 
+### repeat
+
+Infinite loop. Horizontal only, and only where the physics engine loads (see `load`).
+
+```html
+<BlossomCarousel repeat>...</BlossomCarousel>
+```
+
+### load
+
+By default the engine only loads on devices with a fine pointer (mouse, trackpad); touch devices keep native scrolling and load nothing. `load="always"` loads it everywhere.
+
+```html
+<BlossomCarousel load="always">...</BlossomCarousel>
+```
+
+The Svelte component doesn't expose navigation methods. The carousel element dispatches a bubbling `change` event (`event.detail.index`), which a parent element can listen to.
+
+### Vertical carousels
+
+The axis follows the carousel's CSS overflow and can change per breakpoint. See the [core docs](https://www.npmjs.com/package/@numbered/carousel#vertical-carousels).
+
 ## Examples
 
 - [Simple](https://www.blossom-carousel.com/docs/examples#simple)

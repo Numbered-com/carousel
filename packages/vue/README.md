@@ -58,6 +58,55 @@ Renders as
 </ul>
 ```
 
+### repeat
+
+Infinite loop. Horizontal only, and only where the physics engine loads (see `load`).
+
+```html
+<BlossomCarousel repeat>...</BlossomCarousel>
+```
+
+### load
+
+By default the engine only loads on devices with a fine pointer (mouse, trackpad); touch devices keep native scrolling and load nothing. `load="always"` loads it everywhere.
+
+```html
+<BlossomCarousel load="always">...</BlossomCarousel>
+```
+
+### change event
+
+The carousel element dispatches a `change` event when the active snap point changes.
+
+```html
+<BlossomCarousel @change="(e) => e.target === e.currentTarget && console.log(e.detail.index)">...</BlossomCarousel>
+```
+
+The target check skips native `change` events bubbling up from inputs inside slides.
+
+### Navigation
+
+The component exposes `next()`, `prev()`, `currentIndex()` and the element as `el`. Positions follow each slide's `scroll-snap-align`, `scroll-margin` and the carousel's `scroll-padding`.
+
+```html
+<script setup>
+import { ref } from "vue";
+const carousel = ref(null);
+</script>
+
+<template>
+  <BlossomCarousel ref="carousel">...</BlossomCarousel>
+  <button @click="carousel.prev()">Previous</button>
+  <button @click="carousel.next()">Next</button>
+</template>
+```
+
+The engine isn't loaded on touch devices unless `load="always"`, so the methods do nothing there.
+
+### Vertical carousels
+
+The axis follows the carousel's CSS overflow and can change per breakpoint. See the [core docs](https://www.npmjs.com/package/@numbered/carousel#vertical-carousels).
+
 ## Examples
 
 - [Simple](https://www.blossom-carousel.com/docs/examples#simple)

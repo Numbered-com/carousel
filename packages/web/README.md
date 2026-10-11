@@ -29,6 +29,16 @@ import "@numbered/carousel/style.css";
 </blossom-carousel>
 ```
 
+The element dispatches a `change` event (`event.detail.index`) when the active snap point changes:
+
+```javascript
+document.querySelector("blossom-carousel").addEventListener("change", (e) => {
+  if (e.target === e.currentTarget) console.log(e.detail.index);
+});
+```
+
+The web component doesn't support `repeat` and exposes no navigation methods. Vertical carousels work through CSS: see the [core docs](https://www.npmjs.com/package/@numbered/carousel#vertical-carousels).
+
 ## Examples
 
 - [Simple](https://www.blossom-carousel.com/docs/examples#simple)

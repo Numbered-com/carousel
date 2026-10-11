@@ -63,6 +63,61 @@ Renders as
 </ul>
 ```
 
+### repeat
+
+Infinite loop. Horizontal only, and only where the physics engine loads (see `load`).
+
+```jsx
+<BlossomCarousel repeat>{/* slides */}</BlossomCarousel>
+```
+
+### load
+
+By default the engine only loads on devices with a fine pointer (mouse, trackpad); touch devices keep native scrolling and load nothing. `load="always"` loads it everywhere.
+
+```jsx
+<BlossomCarousel load="always">{/* slides */}</BlossomCarousel>
+```
+
+### onChange
+
+Called when the active snap point changes.
+
+```jsx
+<BlossomCarousel onChange={(e) => console.log(e.detail.index)}>{/* slides */}</BlossomCarousel>
+```
+
+### ref
+
+Navigation methods. Positions follow each slide's `scroll-snap-align`, `scroll-margin` and the carousel's `scroll-padding`.
+
+```tsx
+import { type BlossomCarouselRef, BlossomCarousel } from "@numbered/carousel-react";
+
+const carousel = useRef<BlossomCarouselRef>(null);
+
+<BlossomCarousel ref={carousel}>{/* slides */}</BlossomCarousel>
+<button onClick={() => carousel.current?.prev()}>Previous</button>
+<button onClick={() => carousel.current?.next()}>Next</button>
+// carousel.current?.currentIndex()
+```
+
+The engine isn't loaded on touch devices unless `load="always"`, so the methods do nothing there.
+
+### elementRef
+
+Ref to the rendered carousel element.
+
+```tsx
+const element = useRef<HTMLElement>(null);
+
+<BlossomCarousel elementRef={element}>{/* slides */}</BlossomCarousel>
+```
+
+### Vertical carousels
+
+The axis follows the carousel's CSS overflow and can change per breakpoint. See the [core docs](https://www.npmjs.com/package/@numbered/carousel#vertical-carousels).
+
 ## Examples
 
 - [Simple](https://www.blossom-carousel.com/docs/examples#simple)
