@@ -153,6 +153,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	const virtualSnapPoints: number[] = []
 	let slides: HTMLElement[] = []
 	const observedSlides = new Set<HTMLElement>()
+	let slidesResized = false
 	let resizeObserver: ResizeObserver | null = null
 	let mutationObserver: MutationObserver | null = null
 	// Observer callbacks are coalesced into one sync per microtask; structureDirty
@@ -197,7 +198,10 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			if (target === scroller || scroller.contains(target)) setIsTicking(false)
 		})
 
-		resizeObserver = new ResizeObserver(() => {
+		resizeObserver = new ResizeObserver((entries) => {
+			// A slide's own resize can move snap points without changing the scroller's
+			// aggregate size (one grows, another shrinks), so it must defeat sync()'s size bail
+			if (entries.some((entry) => observedSlides.has(entry.target as HTMLElement))) slidesResized = true
 			scheduleSync(false)
 		})
 		// If scroller width matches parent width, observe parent for resize events
@@ -301,6 +305,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		// only trustworthy once the translations are cleared, so no early bail there.
 		if (
 			!resolveStructure &&
+			!slidesResized &&
 			!options?.repeat &&
 			scroller.scrollWidth === scrollerScrollWidth &&
 			scroller.scrollHeight === scrollerScrollHeight &&
@@ -308,6 +313,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		) {
 			return
 		}
+		slidesResized = false
 
 		setIsTicking(false)
 
