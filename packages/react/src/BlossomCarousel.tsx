@@ -48,6 +48,8 @@ export default function BlossomCarousel({
 		if (!localRef.current || !onChange) return
 
 		const handleChange = (e: Event) => {
+			// Native `change` from inputs inside slides, and nested carousels' events, bubble here too
+			if (e.target !== e.currentTarget || !(e instanceof CustomEvent)) return
 			onChange(e as CustomEvent<{ index: number }>)
 		}
 

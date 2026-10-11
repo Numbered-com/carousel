@@ -20,7 +20,7 @@ Blossom Carousel is a native-scroll-first carousel component library with physic
 
 This is a **bun workspace monorepo** with the following packages:
 
-- `packages/core` - Core TypeScript library with Vite build ([blossom-carousel.ts](packages/core/src/blossom-carousel.ts:1))
+- `packages/core` - Core TypeScript library with Vite build ([carousel.ts](packages/core/src/carousel.ts:1))
 - `packages/react` - React 19 wrapper component
 - `packages/vue` - Vue 3 wrapper component
 - `packages/svelte` - Svelte wrapper component
@@ -58,11 +58,12 @@ TypeScript is pinned to 6.x via a root `overrides` entry: `unplugin-dts` (behind
 ## Core Architecture
 
 ### Main Entry Point
-[packages/core/src/blossom-carousel.ts](packages/core/src/blossom-carousel.ts:15) exports the `Blossom` factory function which accepts:
+[packages/core/src/carousel.ts](packages/core/src/carousel.ts:59) exports the `Blossom` factory function which accepts:
 - `scroller: HTMLElement` - The scrollable container element
 - `options: CarouselOptions` - Configuration options:
-  - `repeat?: boolean` - Enable infinite scroll mode (automatically disabled on touch devices)
-  - `load?: 'always'` - Force physics loading on all devices including touch
+  - `repeat?: boolean` - Enable infinite scroll mode. Core honours it on every device; touch devices skip it only because the wrappers don't initialise Blossom there
+
+`load: 'always'` is a wrapper prop/option, not a core option: wrappers skip `Blossom()` on non-fine-pointer devices unless it is set.
 
 Returns an object with:
 - `init()` - Initialize the carousel
@@ -73,8 +74,8 @@ Returns an object with:
 - `hasOverflow` - Proxy object tracking overflow state
 
 ### Physics System
-The carousel uses a custom physics ticker ([tick function](packages/core/src/blossom-carousel.ts:423)) with:
-- **Friction** (`FRICTION = 0.72`) - Applied to velocity each frame
+The carousel uses a custom physics ticker ([tick function](packages/core/src/carousel.ts:709)) with:
+- **Friction** (`FRICTION = 0.72`) - Applied to velocity per 60Hz step, scaled by elapsed time so motion is frame-rate independent
 - **Damping** (`DAMPING = 0.12`) - Smooth interpolation using exponential decay via `damp()` function
 - **Velocity projection** - Predicts final resting position for snap point selection
 - **Rubber banding** - 0.2x resistance when dragging beyond edges
