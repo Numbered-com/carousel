@@ -23,6 +23,8 @@ const blossom = Blossom(element);
 blossom.init();
 ```
 
+The stylesheet is required, framework wrappers included: besides the base layout, it turns native snapping off while the physics engine moves the scroller, so the two never fight.
+
 ## Lazy loading
 
 Load Blossom only when needed.
