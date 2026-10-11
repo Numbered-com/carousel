@@ -20,7 +20,7 @@ This is Numbered's fork of [jespervos/blossom-carousel](https://github.com/jespe
 <li>🚀 <strong>Dragging</strong>: Custom physics-based dragging for mouse and trackpad.</li>
 <li>✨ <strong>No abstraction</strong>: use all native web API's.</li>
 <li>💡 <strong>Configure with CSS</strong>: Works with native scroll-snap, position sticky and scroll-driven animations.</li>
-<li>🪶 <strong>0kb on touch devices</strong>: Blossom only loads when a fine pointer device is detected.</li>
+<li>🪶 <strong>0kb on touch devices</strong>: the Vue and Svelte components, and the core's lazy-loading pattern, only download the engine when a fine pointer device is detected.</li>
 <li>🧭 <strong>Navigation</strong>: <code>prev()</code>, <code>next()</code> and a <code>change</code> event, aligned by your CSS snap settings.</li>
 <li>↕️ <strong>Both axes</strong>: Horizontal or vertical, switchable per breakpoint with one DOM.</li>
 <li>🧱 <strong>Works with major frameworks</strong>: Components for React, Vue, Svelte, Alpine.js and Web Components.</li>
@@ -86,7 +86,7 @@ Compared with upstream at the fork point ([`fd84d1e`](https://github.com/jesperv
 - **Vertical carousels**: the axis follows the carousel's CSS overflow, so one element can be horizontal on mobile and vertical on desktop. Drag, momentum, rubber band, keyboard and navigation all follow it.
 - **Native snapping at rest**: trackpad, wheel and keyboard scrolls snap natively; physics only takes over snapping while it moves the carousel.
 - **Repeat mode**: seamless wrapping in both directions, loop length measured from the slides (gaps, grid tracks), no ping-pong at the edges. Horizontal only.
-- **Touch devices**: scrolling stays native and navigation uses `scrollIntoView`, still with no physics bundle unless you opt in.
+- **Touch devices**: scrolling stays native and navigation uses `scrollIntoView`. React and Alpine skip initialising the engine there but still bundle it; Vue and Svelte don't download it.
 - **Performance and lifecycle**: no layout thrash on scroll or resize, a ticker that stops once settled, frame-rate independent friction, slides re-measured when they resize, and a `destroy()` that undoes everything so `init()` can run again.
 - **Wrappers**: an Alpine.js plugin; React `repeat`, `load`, `onChange`, `ref` (navigation) and `elementRef` props; Vue `repeat` prop and exposed navigation methods.
 - **Tests**: a browser test suite for the core (see [Development](#development)).

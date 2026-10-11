@@ -48,8 +48,8 @@ The plugin registers a `carousel` component. The carousel is the element with `x
 
 | Option   | Default | Description                                                                                                                                       |
 | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `repeat` | `false` | Infinite loop. Horizontal only, and only where the physics engine loads.                                                                          |
-| `load`   | -       | By default the engine only loads on devices with a fine pointer (mouse, trackpad); touch devices keep native scrolling. `'always'` loads it everywhere. |
+| `repeat` | `false` | Infinite loop. Horizontal only, and only where the physics engine runs.                                                                           |
+| `load`   | -       | By default the engine only initialises on devices with a fine pointer (mouse, trackpad); touch devices keep native scrolling. `'always'` initialises it everywhere. The plugin imports the engine statically, so it is downloaded on every device. |
 
 Without the engine (touch devices, unless `load: 'always'`), `prev()`/`next()` do nothing and `currentIndex` stays `0`.
 

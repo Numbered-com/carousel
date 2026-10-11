@@ -65,7 +65,7 @@ Renders as
 
 ### repeat
 
-Infinite loop. Horizontal only, and only where the physics engine loads (see `load`).
+Infinite loop. Horizontal only, and only where the physics engine runs (see `load`).
 
 ```jsx
 <BlossomCarousel repeat>{/* slides */}</BlossomCarousel>
@@ -73,7 +73,7 @@ Infinite loop. Horizontal only, and only where the physics engine loads (see `lo
 
 ### load
 
-By default the engine only loads on devices with a fine pointer (mouse, trackpad); touch devices keep native scrolling and load nothing. `load="always"` loads it everywhere.
+By default the engine only initialises on devices with a fine pointer (mouse, trackpad); touch devices keep native scrolling. `load="always"` initialises it everywhere. The engine is imported statically, so it is part of your bundle on every device; to keep it off touch devices entirely, lazy-load the component behind the same media query.
 
 ```jsx
 <BlossomCarousel load="always">{/* slides */}</BlossomCarousel>
