@@ -241,6 +241,98 @@
 				'last destroy() restores scrollIntoView and the scrollTo override',
 			)
 
+			// --- 11. A library wrapping our scrollIntoView patch survives destroy() and re-init ---
+			const nativeSIV = Element.prototype.scrollIntoView
+			let nativeCalls = 0
+			Element.prototype.scrollIntoView = function (...args) {
+				nativeCalls++
+				return nativeSIV.apply(this, args)
+			}
+			const wrapEl = document.createElement('ul')
+			wrapEl.className = 'carousel'
+			document.getElementById('stage').append(wrapEl)
+			for (let i = 0; i < 3; i++) wrapEl.append(richSlide())
+			const wrapCarousel = Blossom(wrapEl, {})
+			wrapCarousel.init()
+			const ours = Element.prototype.scrollIntoView
+			Element.prototype.scrollIntoView = function (...args) {
+				return ours.apply(this, args) // external library wrapping Blossom's patch
+			}
+			wrapCarousel.destroy()
+			wrapEl.firstElementChild.scrollIntoView({ block: 'nearest' })
+			assert(nativeCalls === 1, 'a retained external wrapper still reaches native scrollIntoView after destroy()', `${nativeCalls} native calls`)
+			wrapCarousel.init()
+			let threw = null
+			try {
+				wrapEl.firstElementChild.scrollIntoView({ block: 'nearest' })
+			} catch (e) {
+				threw = e
+			}
+			assert(!threw && nativeCalls === 2, 're-init over an external wrapper neither recurses nor drops the native call', threw ? String(threw) : `${nativeCalls} native calls`)
+			wrapCarousel.destroy()
+			Element.prototype.scrollIntoView = nativeSIV
+
+			// --- 12. Snap areas include asymmetric scroll-margin, as native snapping does ---
+			for (const [align, margin, expected] of [
+				['start', 'scroll-margin-left:30px;scroll-margin-right:5px', (r, box) => r.left - 30 - box.left],
+				['end', 'scroll-margin-left:5px;scroll-margin-right:30px', (r, box) => r.right + 30 - box.right],
+			]) {
+				const marginEl = document.createElement('ul')
+				marginEl.className = 'carousel'
+				document.getElementById('stage').append(marginEl)
+				for (let i = 0; i < 6; i++) {
+					const slide = richSlide()
+					slide.style.cssText = `scroll-snap-align:${align};${margin}`
+					marginEl.append(slide)
+				}
+				const marginCarousel = Blossom(marginEl, {})
+				marginCarousel.init()
+				await frame()
+				marginCarousel.next()
+				await wait(1500)
+				// Snap indices skip clamped duplicates, so look for whichever slide is aligned
+				const box = marginEl.getBoundingClientRect()
+				const offs = [...marginEl.children].map((el) => Math.round(expected(el.getBoundingClientRect(), box)))
+				const off = offs.reduce((a, b) => (Math.abs(b) < Math.abs(a) ? b : a))
+				assert(marginEl.scrollLeft > 0 && Math.abs(off) <= 1, `${align}-aligned snap includes the slide's scroll-margin`, `closest snap area edge is ${off}px from the snapport edge`)
+				marginCarousel.destroy()
+			}
+
+			// --- 13. A stationary press after a drag doesn't start the ticker, whichever axis dominated ---
+			for (const [label, dx, dy] of [['horizontal', 10, 1], ['vertical', 1, 10]]) {
+				const axisEl = document.createElement('ul')
+				axisEl.className = 'carousel'
+				axisEl.style.cssText = 'overflow-y:auto;height:60px'
+				document.getElementById('stage').append(axisEl)
+				for (let i = 0; i < 6; i++) axisEl.append(richSlide())
+				const axisCarousel = Blossom(axisEl, {})
+				axisCarousel.init()
+				await frame()
+				const ptr = (x, y) => ({ bubbles: true, clientX: x, clientY: y, button: 0, pointerType: 'mouse' })
+				const slide = axisEl.firstElementChild
+				// Drag along the dominant axis while drifting slightly on the other one
+				slide.dispatchEvent(new PointerEvent('pointerdown', ptr(300, 40)))
+				for (let i = 1; i <= 10; i++) {
+					window.dispatchEvent(new PointerEvent('pointermove', ptr(300 - i * dx, 40 - i * dy)))
+					await wait(16)
+				}
+				window.dispatchEvent(new PointerEvent('pointerup', ptr(300 - 10 * dx, 40 - 10 * dy)))
+				await wait(1500)
+
+				const axisScrollTo = axisEl.scrollTo.bind(axisEl)
+				let writes = 0
+				axisEl.scrollTo = (...args) => {
+					writes++
+					return axisScrollTo(...args)
+				}
+				slide.dispatchEvent(new PointerEvent('pointerdown', ptr(200, 30)))
+				await wait(300)
+				window.dispatchEvent(new PointerEvent('pointerup', ptr(200, 30)))
+				assert(writes === 0, `stationary press after a ${label}-dominant drag stays idle`, `${writes} scroll writes while held`)
+				axisCarousel.destroy()
+				axisEl.remove()
+			}
+
 			log.insertAdjacentHTML('beforeend', `<h2 class="${failures ? 'fail' : 'pass'}">${failures ? `${failures} FAILED` : 'ALL PASS'}</h2>`)
 			document.title = failures ? `${failures} FAILED` : 'ALL PASS'
 		</script>

@@ -27,6 +27,13 @@
 		padding-inline: 50% !important;
 	}
 
+	/* Physics mode writes an inline scroll-snap-type: none; hand snapping back to the browser
+	   while at rest, so trackpad/wheel/keyboard scrolls still snap. Repeat mode translates
+	   slides, which native snapping can't follow, so it keeps physics-only snapping. */
+	&[has-repeat="false"]:not([has-snap="false"]) {
+		scroll-snap-type: var(--snap-type) !important;
+	}
+
 	& > * {
 		display: inline-block;
 		white-space: initial;
