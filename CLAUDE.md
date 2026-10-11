@@ -83,11 +83,13 @@ The carousel uses a custom physics ticker ([tick function](packages/core/src/blo
 1. **Conditional loading** - Physics engine only loads on devices with `(hover: hover) and (pointer: fine)` media query, touch devices use native CSS scroll-snap
 2. **Pointer interaction** - Only activates on fine pointer devices (mouse/trackpad)
 3. **Scroll interception** - Patches `scrollTo`, `scrollBy`, and `Element.prototype.scrollIntoView` to disable physics during programmatic scrolling
-4. **Snap point calculation** - Traverses DOM to find elements with `scroll-snap-align`, computes their positions relative to scroll container
-5. **Virtual snap points** - Improved slide positioning system for more precise alignment
-6. **Repeat mode** - Translates slides to create infinite scroll illusion, resets scroll position when reaching edges (disabled on touch devices)
-7. **Index tracking** - Dispatches custom `change` events with `detail.index` when the active slide changes
-8. **Navigation methods** - `prev()` and `next()` methods for programmatic slide navigation
+4. **Snap point calculation** - Traverses DOM to find elements with `scroll-snap-align`, computes their positions relative to scroll container along the snap axis
+5. **Snap axis** - Re-read on every sync from the computed overflow: vertical when `overflow-y` scrolls (`auto`/`scroll`) and `overflow-x` doesn't, otherwise horizontal. A stylesheet can switch it per breakpoint with one DOM. Repeat mode is horizontal only
+6. **Snap suppression** - Physics owns snapping while it moves (`has-snap="false"`) and always in repeat mode (`has-repeat="true"`), both via `scroll-snap-type: none !important` in `style.css`; otherwise the authored `scroll-snap-type` applies
+7. **Virtual snap points** - Improved slide positioning system for more precise alignment
+8. **Repeat mode** - Translates slides to create infinite scroll illusion, resets scroll position when reaching edges (disabled on touch devices)
+9. **Index tracking** - Dispatches custom `change` events with `detail.index` when the active slide changes
+10. **Navigation methods** - `prev()` and `next()` methods for programmatic slide navigation
 
 ### Important State Variables
 - `virtualScroll` - The smoothed scroll position updated by physics ticker

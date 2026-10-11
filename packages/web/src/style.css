@@ -21,10 +21,6 @@
       padding: 0 50% !important;
     } */
 
-  &[has-snap="true"] {
-    scroll-snap-type: var(--snap-type) !important;
-  }
-
   &[has-overflow="true"] {
     cursor: grab;
 

@@ -50,6 +50,24 @@ Destroy the Blossom instance when you no longer need it to free up resources.
 blossom.destroy();
 ```
 
+## Vertical carousels
+
+The snap axis follows the carousel's overflow. Make it scroll vertically only and Blossom drags, snaps and navigates along `y`; this can change per breakpoint, so one element can be horizontal on mobile and vertical on desktop:
+
+```css
+@media (min-width: 1024px) {
+  #my-carousel-element {
+    display: flex;
+    flex-direction: column;
+    overflow-x: clip;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+  }
+}
+```
+
+Repeat mode only loops horizontally. Overscroll events carry `detail.left` horizontally and `detail.top` vertically.
+
 ### Get started in your favorite framework:
 
 - [React](https://www.npmjs.com/package/@numbered/carousel/react)

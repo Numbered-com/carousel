@@ -41,11 +41,14 @@ interface HasOverflow {
 	y: boolean
 }
 
+type Axis = 'x' | 'y'
+
 interface SnapCandidate {
 	el: HTMLElement
 	align: string
-	marginLeft: number
-	marginRight: number
+	// Along the snap axis: left/right horizontally, top/bottom vertically
+	marginStart: number
+	marginEnd: number
 }
 
 export interface CarouselOptions {
@@ -142,7 +145,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	let scrollerWidth = 300
 	let scrollerScrollHeight = 300
 	let scrollerHeight = 300
-	const scrollPadding = { left: 0, right: 0 }
+	// Along the snap axis, physical: left/right horizontally, top/bottom vertically
+	const scrollPadding = { start: 0, end: 0 }
 	let gap = 0
 	let snapPoints: number[] = []
 	let snapElements: HTMLElement[] = []
@@ -163,9 +167,10 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	let hasSnap = false
 	let hasMouse = false
 	let nativeScroll = true
-	let previousInlineSnapType = ''
 	let restoreScrollMethods: () => void
 	let dir = 1
+	// Snap axis, from the authored overflow (see sync). Repeat mode only loops horizontally.
+	let axis: Axis = 'x'
 
 	function init() {
 		// Re-entrant: a second init() without destroy() would otherwise strand the previous
@@ -178,18 +183,14 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		window.addEventListener('keydown', onKeydown)
 		scroller.addEventListener('scroll', onScroll, { passive: true })
 
-		const { scrollSnapType } = window.getComputedStyle(scroller)
-		hasSnap = scrollSnapType !== 'none'
-		scroller.style.setProperty('--snap-type', scrollSnapType)
+		// Read before has-repeat is set: its stylesheet rule suppresses snapping for good, so
+		// repeat mode keeps this read, while sync() re-reads it for every other carousel.
+		hasSnap = window.getComputedStyle(scroller).scrollSnapType !== 'none'
 		scroller.setAttribute('has-repeat', options?.repeat ? 'true' : 'false')
 
 		hasMouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches
 
 		nativeScroll = !hasMouse && !options?.repeat
-		previousInlineSnapType = scroller.style.scrollSnapType
-		if (!nativeScroll) {
-			scroller.style.scrollSnapType = 'none'
-		}
 
 		restoreScrollMethods = interceptScrollIntoViewCalls((target) => {
 			if (target === scroller || scroller.contains(target)) setIsTicking(false)
@@ -245,13 +246,10 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		hasOverflow.x = false
 		hasOverflow.y = false
 
-		// Undo everything init() wrote. Notably scrollSnapType: leaving our own 'none' on
-		// the element makes a later init() read it back as the authored value, conclude the
-		// carousel doesn't snap, and come up with no snap points at all.
+		// Undo everything init() wrote. Snapping is suppressed through the has-snap/has-repeat
+		// attributes (style.css), so removing them hands back the authored scroll-snap-type.
 		clearTranslations()
-		scroller.style.scrollSnapType = previousInlineSnapType
 		scroller.style.transform = ''
-		scroller.style.removeProperty('--snap-type')
 		scroller.removeAttribute('has-repeat')
 		scroller.removeAttribute('has-snap')
 
@@ -315,22 +313,25 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		scrollerHeight = scroller.clientHeight
 
 		const styles = window.getComputedStyle(scroller)
-		hasOverflow.x =
-			// !hasTouch &&
-			scrollerScrollWidth > scrollerWidth && ['auto', 'scroll'].includes(styles.getPropertyValue('overflow-x'))
-		hasOverflow.y =
-			// !hasTouch &&
-			scrollerScrollHeight > scrollerHeight && ['auto', 'scroll'].includes(styles.getPropertyValue('overflow-y'))
+		const scrollable = (overflow: string) => overflow === 'auto' || overflow === 'scroll'
+		hasOverflow.x = scrollerScrollWidth > scrollerWidth && scrollable(styles.overflowX)
+		hasOverflow.y = scrollerScrollHeight > scrollerHeight && scrollable(styles.overflowY)
+		// The authored overflow picks the snap axis, so a stylesheet can switch it per breakpoint
+		axis = !options?.repeat && scrollable(styles.overflowY) && !scrollable(styles.overflowX) ? 'y' : 'x'
+		// setIsTicking(false) above lifted the drag-time suppression, so this is the authored
+		// value for the current breakpoint. Repeat suppresses snapping for good (see init).
+		if (!options?.repeat) hasSnap = styles.scrollSnapType !== 'none'
 		// Computed scroll-padding keeps percentages (repeat mode uses 50%), so resolve them
 		// against the scrollport ourselves; parseInt would read "50%" as 50px.
-		const px = (value: string) =>
-			value.endsWith('%') ? (Number.parseFloat(value) * scrollerWidth) / 100 : Number.parseFloat(value) || 0
-		scrollPadding.left = px(styles.scrollPaddingLeft)
-		scrollPadding.right = px(styles.scrollPaddingRight)
-		dir = styles.direction === 'rtl' ? -1 : 1
-		// `gap` is the "row column" shorthand; only the column gap separates slides horizontally,
+		const viewport = axis === 'x' ? scrollerWidth : scrollerHeight
+		const px = (value: string) => (value.endsWith('%') ? (Number.parseFloat(value) * viewport) / 100 : Number.parseFloat(value) || 0)
+		scrollPadding.start = px(axis === 'x' ? styles.scrollPaddingLeft : styles.scrollPaddingTop)
+		scrollPadding.end = px(axis === 'x' ? styles.scrollPaddingRight : styles.scrollPaddingBottom)
+		// RTL only mirrors the inline axis
+		dir = axis === 'x' && styles.direction === 'rtl' ? -1 : 1
+		// `gap` is the "row column" shorthand; only the gap along the axis separates slides,
 		// and only in flex/grid: the default inline-block layout reports it but never applies it.
-		gap = /flex|grid/.test(styles.display) ? Number.parseFloat(styles.columnGap) || 0 : 0
+		gap = /flex|grid/.test(styles.display) ? Number.parseFloat(axis === 'x' ? styles.columnGap : styles.rowGap) || 0 : 0
 		end = (scrollerScrollWidth - scrollerWidth + gap) * dir
 
 		// Which elements snap only changes when the child list changes; their positions
@@ -350,8 +351,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		// Repositioning mid-drag would yank the carousel out from under the pointer
 		const point = snapPoints[currentIndex.value]
 		if (point !== undefined && !isDragging) {
-			target.x = virtualScroll.x = point
-			scroller.scrollTo({ left: point, behavior: 'instant' })
+			target[axis] = virtualScroll[axis] = point
+			scroller.scrollTo({ [axis === 'x' ? 'left' : 'top']: point, behavior: 'instant' })
 		}
 		if (options?.repeat) {
 			onRepeat()
@@ -362,15 +363,16 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	// slide's own rich content is never descended into. The expensive case is a carousel
 	// whose slides don't snap at all; that's why the result is cached and only re-resolved
 	// when the structure (or a media query, via a width change) could have altered it.
+	// That includes the axis, which only a width-dependent media query flips in practice.
 	function findSnapCandidates(): SnapCandidate[] {
 		const found: SnapCandidate[] = []
 
 		const collect = (children: HTMLCollection) => {
 			for (const node of children) {
 				const style = window.getComputedStyle(node)
-				// scroll-snap-align is `<block> <inline>`; the inline value drives horizontal snapping
+				// scroll-snap-align is `<block> <inline>`; a single value applies to both
 				const parts = style.scrollSnapAlign.split(' ')
-				const align = parts[1] ?? parts[0]
+				const align = axis === 'x' ? (parts[1] ?? parts[0]) : parts[0]
 
 				if (align !== 'none') {
 					// Read here, from the style we already have: scroll-margin only changes with
@@ -378,8 +380,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 					found.push({
 						el: node as HTMLElement,
 						align,
-						marginLeft: Number.parseFloat(style.scrollMarginLeft) || 0,
-						marginRight: Number.parseFloat(style.scrollMarginRight) || 0,
+						marginStart: Number.parseFloat(axis === 'x' ? style.scrollMarginLeft : style.scrollMarginTop) || 0,
+						marginEnd: Number.parseFloat(axis === 'x' ? style.scrollMarginRight : style.scrollMarginBottom) || 0,
 					})
 					continue
 				}
@@ -396,8 +398,12 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	// Read-only: no style writes may happen between the rect reads below.
 	function measureSnapPoints(): void {
 		const scrollerRect = scroller.getBoundingClientRect()
+		const vertical = axis === 'y'
+		const viewport = vertical ? scrollerHeight : scrollerWidth
 		// Scroll coordinates start at the padding box, so exclude the border (and a left scrollbar)
-		const originLeft = scrollerRect.left + scroller.clientLeft - scroller.scrollLeft
+		const origin = vertical
+			? scrollerRect.top + scroller.clientTop - scroller.scrollTop
+			: scrollerRect.left + scroller.clientLeft - scroller.scrollLeft
 		// Native snap clamps snap positions to the scrollable range; unclamped points past the
 		// end are unreachable, so the index could never get there and next() would stall.
 		const maxScroll = getMaxScrollPosition() * dir
@@ -410,25 +416,26 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		snapCenters = []
 		const seenPositions = new Set<number>()
 
-		for (const { el, align, marginLeft, marginRight } of snapCandidates) {
+		for (const { el, align, marginStart, marginEnd } of snapCandidates) {
 			// Snap areas are border boxes (clientWidth drops borders and rounds) grown by scroll-margin
-			const { left: rectLeft, width } = el.getBoundingClientRect()
-			const left = rectLeft - originLeft
-			const areaLeft = left - marginLeft
-			const areaRight = left + width + marginRight
+			const rect = el.getBoundingClientRect()
+			const offset = (vertical ? rect.top : rect.left) - origin
+			const size = vertical ? rect.height : rect.width
+			const areaStart = offset - marginStart
+			const areaEnd = offset + size + marginEnd
 			// start/end are logical: in RTL, start is the physical right edge
 			const physical = dir === -1 && align !== 'center' ? (align === 'start' ? 'end' : 'start') : align
 
 			let position: number | null = null
 			switch (physical) {
 				case 'start':
-					position = areaLeft - scrollPadding.left
+					position = areaStart - scrollPadding.start
 					break
 				case 'end':
-					position = areaRight - scrollerWidth + scrollPadding.right
+					position = areaEnd - viewport + scrollPadding.end
 					break
 				case 'center':
-					position = (areaLeft + areaRight) / 2 - (scrollerWidth + scrollPadding.left - scrollPadding.right) / 2
+					position = (areaStart + areaEnd) / 2 - (viewport + scrollPadding.start - scrollPadding.end) / 2
 					break
 			}
 			if (position === null) continue
@@ -441,7 +448,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			snapPoints.push(position)
 			snapElements.push(el)
 			snapAlignments.push(align as ScrollLogicalPosition)
-			snapCenters.push(left + width / 2)
+			snapCenters.push(offset + size / 2)
 		}
 	}
 
@@ -449,8 +456,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		// While ticking, tick() already handles repeat and the index for the scroll it just made
 		if (isDragging || isTicking || !scroller) return
 
-		const scrollStart = scroller.scrollLeft
-		virtualScroll.x = target.x = scrollStart
+		const scrollStart = axis === 'x' ? scroller.scrollLeft : scroller.scrollTop
+		virtualScroll[axis] = target[axis] = scrollStart
 
 		if (options?.repeat) {
 			// onRepeat may scroll us elsewhere, so let the index re-read the position
@@ -495,8 +502,13 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	}
 
 	function onPointerDown(e: PointerEvent | TouchEvent): void {
-		// Primary button only, and not on the scrollbar, whose native drag we'd fight
-		if (!scroller || ('button' in e && e.button !== 0) || ('offsetY' in e && e.target === scroller && e.offsetY > scrollerHeight)) return
+		// Primary button only, and not on a scrollbar, whose native drag we'd fight
+		if (
+			!scroller ||
+			('button' in e && e.button !== 0) ||
+			('offsetY' in e && e.target === scroller && (e.offsetY > scrollerHeight || e.offsetX > scrollerWidth))
+		)
+			return
 
 		const clientX = 'touches' in e ? e.touches[0]?.clientX : e.clientX
 		const clientY = 'touches' in e ? e.touches[0]?.clientY : e.clientY
@@ -536,7 +548,9 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	}
 
 	function onWheel(e: WheelEvent): void {
-		if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+		// A wheel along the snap axis takes over from the physics; across it, it scrolls the page
+		const onAxis = axis === 'x' ? Math.abs(e.deltaX) > Math.abs(e.deltaY) : Math.abs(e.deltaY) > Math.abs(e.deltaX)
+		if (onAxis) {
 			setIsTicking(false)
 			if (isDragging || !scroller) return
 			if (hasOverflow.x) virtualScroll.x = scroller.scrollLeft
@@ -549,12 +563,11 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	}
 
 	function dragSnap(): void {
-		//TODO: add support for vertical snapping
 		// Snap to the point nearest the projected resting position. Repeat mode used to step
 		// one slide past the *live* index, which had already advanced mid-drag, so a one-slide
 		// drag moved two. virtualSnapPoints (repeat) are the copies around the viewport;
 		// snapPoints (otherwise) are already clamped to the scroll range.
-		if (snapElements.length) animateToSlideX(snapSelect({ axis: 'x' }))
+		if (snapElements.length) animateTo(snapSelect())
 	}
 
 	/*********************
@@ -681,7 +694,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		if (options?.repeat) {
 			onRepeat()
 		} else {
-			applyRubberBanding(round(virtualScroll.x, 2))
+			applyRubberBanding(round(virtualScroll[axis], 2))
 		}
 
 		__scrollingInternally = true
@@ -691,8 +704,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			behavior: 'instant' as ScrollBehavior,
 		})
 
-		// virtualScroll is what we just scrolled to, so we don't need to read scrollLeft back
-		updateCurrentIndex(virtualScroll.x)
+		// virtualScroll is what we just scrolled to, so we don't need to read the position back
+		updateCurrentIndex(virtualScroll[axis])
 
 		// Stop once motion has converged, otherwise this loop runs forever
 		if (isSettled()) {
@@ -717,25 +730,24 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	}
 
 	let rubberBandOffset = 0
-	function applyRubberBanding(left: number): void {
+	function applyRubberBanding(position: number): void {
 		if (!scroller) return
 
-		//TODO: add support for vertical rubber banding
 		// The real scroll edge; `end` includes the loop gap and would delay the band by `gap` px
 		const edge = getMaxScrollPosition()
 
 		let targetOffset = 0
-		if (left * dir <= 0) {
-			targetOffset = isDragging ? left * -0.2 : 0
-		} else if (left * dir > edge) {
-			targetOffset = isDragging ? (left - edge * dir) * -0.2 : 0
+		if (position * dir <= 0) {
+			targetOffset = isDragging ? position * -0.2 : 0
+		} else if (position * dir > edge) {
+			targetOffset = isDragging ? (position - edge * dir) * -0.2 : 0
 		}
 		rubberBandOffset = damp(rubberBandOffset, targetOffset, isDragging ? 0.8 : DAMPING, frameDelta)
 
 		if (Math.abs(rubberBandOffset) > 0.01) {
 			const evt = dispatchOverscrollEvent(rubberBandOffset)
 			if (evt.defaultPrevented) return
-			scroller.style.transform = `translateX(${round(rubberBandOffset, 3)}px)`
+			scroller.style.transform = `${axis === 'x' ? 'translateX' : 'translateY'}(${round(rubberBandOffset, 3)}px)`
 			return
 		}
 
@@ -746,11 +758,12 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		}
 	}
 
-	function dispatchOverscrollEvent(left: number): CustomEvent<{ left: number }> {
+	// detail.left on the horizontal axis, detail.top on the vertical one
+	function dispatchOverscrollEvent(offset: number): CustomEvent<{ left?: number; top?: number }> {
 		const overscrollEvent = new CustomEvent('overscroll', {
 			bubbles: true,
 			cancelable: true,
-			detail: { left },
+			detail: axis === 'x' ? { left: offset } : { top: offset },
 		})
 		scroller?.dispatchEvent(overscrollEvent)
 		return overscrollEvent
@@ -800,10 +813,6 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	 ********* UTILS **************
 	 ******************************/
 
-	interface AxisOption {
-		axis: 'x' | 'y'
-	}
-
 	function handleAxisPointerDown(axis: 'x' | 'y', clientPos: number): void {
 		const scrollProp = axis === 'x' ? 'scrollLeft' : 'scrollTop'
 		virtualScroll[axis] = scroller[scrollProp]
@@ -830,14 +839,14 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		}
 	}
 
-	function project({ axis = 'x' }: AxisOption): number {
+	function project(): number {
 		return target[axis] + velocity[axis] / (1 - FRICTION)
 	}
 
-	function snapSelect({ axis = 'x' }: AxisOption): number {
-		const restingX = project({ axis })
+	function snapSelect(): number {
+		const resting = project()
 		const points = virtualSnapPoints.length ? virtualSnapPoints : snapPoints
-		return points.reduce((prev, curr) => (Math.abs(curr - restingX) < Math.abs(prev - restingX) ? curr : prev))
+		return points.reduce((prev, curr) => (Math.abs(curr - resting) < Math.abs(prev - resting) ? curr : prev))
 	}
 
 	function lerp(x: number, y: number, t: number): number {
@@ -868,7 +877,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	}
 
 	function getMaxScrollPosition(): number {
-		return scrollerScrollWidth - scrollerWidth
+		return axis === 'x' ? scrollerScrollWidth - scrollerWidth : scrollerScrollHeight - scrollerHeight
 	}
 
 	function normalizeToCycle(point: number, reference: number): number {
@@ -878,12 +887,12 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		return point + k * w
 	}
 
-	function animateToSlideX(slideX: number, enforceDir?: 1 | -1): void {
-		if (slideX === undefined || Number.isNaN(slideX)) return
+	function animateTo(position: number, enforceDir?: 1 | -1): void {
+		if (position === undefined || Number.isNaN(position)) return
 
 		setIsTicking(true)
-		target.x = virtualScroll.x
-		let distance = slideX - virtualScroll.x
+		target[axis] = virtualScroll[axis]
+		let distance = position - virtualScroll[axis]
 		if (options?.repeat) {
 			const w = getLoopWidth()
 			if (w > 0) {
@@ -895,7 +904,7 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			}
 		}
 		const force = distance * (1 - FRICTION) * (1 / FRICTION)
-		velocity.x = force
+		velocity[axis] = force
 	}
 
 	function computeRepeatSlideX(targetIndex: number, directionSign: 1 | -1): number {
@@ -913,11 +922,11 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 	 ********* NAVIGATION *********
 	 ******************************/
 
-	function getCurrentSnapIndex(scrollLeft?: number): number {
+	function getCurrentSnapIndex(position?: number): number {
 		const points = options?.repeat && virtualSnapPoints.length ? virtualSnapPoints : snapPoints
 		if (!points.length) return 0
 
-		const currentScroll = scrollLeft ?? scroller.scrollLeft
+		const currentScroll = position ?? (axis === 'x' ? scroller.scrollLeft : scroller.scrollTop)
 		let closestIndex = 0
 		let closestDistance = Math.abs(points[0] - currentScroll)
 
@@ -932,8 +941,8 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 		return closestIndex
 	}
 
-	function updateCurrentIndex(scrollLeft?: number): void {
-		const newIndex = getCurrentSnapIndex(scrollLeft)
+	function updateCurrentIndex(position?: number): void {
+		const newIndex = getCurrentSnapIndex(position)
 		if (currentIndex.value !== newIndex) {
 			currentIndex.value = newIndex
 		}
@@ -953,15 +962,15 @@ export const Blossom = (scroller: HTMLElement, options: CarouselOptions) => {
 			const align = snapAlignments[targetIndex] ?? 'start'
 			;(snapElements[targetIndex] as HTMLElement).scrollIntoView({
 				behavior: 'smooth',
-				block: 'nearest',
-				inline: align,
+				block: axis === 'y' ? align : 'nearest',
+				inline: axis === 'x' ? align : 'nearest',
 			})
 			return
 		}
 
-		const slideX = options?.repeat && points.length >= 2 ? computeRepeatSlideX(targetIndex, direction) : points[targetIndex]
+		const position = options?.repeat && points.length >= 2 ? computeRepeatSlideX(targetIndex, direction) : points[targetIndex]
 
-		animateToSlideX(slideX, direction)
+		animateTo(position, direction)
 	}
 
 	function next(): void {
